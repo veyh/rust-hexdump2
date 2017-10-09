@@ -1,4 +1,6 @@
-/// Reads a hexdump string into bytes.
+use std::fmt::Write;
+
+/// Reads a hexdump into bytes.
 ///
 /// # Examples
 ///
@@ -97,29 +99,47 @@ pub struct ExportOptions {
   pub with_ascii: bool,
 }
 
-
-/// Exports a slice of bytes into a hexdump string.
+/// Dumps a slice of bytes into a string. Optionally with offsets and ascii.
+///
+/// # Examples
+///
+/// ```
+/// assert_eq!(
+///   Ok(String::from("0000 61 62 63 64 abcd\n0004 65 00       e.")),
+///   hexdump2::export(&[
+///     0x61, 0x62, 0x63, 0x64,
+///     0x65, 0x00,
+///   ], hexdump2::ExportOptions {
+///     with_ascii: true,
+///     with_offsets: true,
+///     per_line: 4,
+///   })
+/// );
+/// ```
 pub fn export(
   values: &[u8],
   options: ExportOptions
 ) -> Result<String, ExportError> {
   let mut res = String::new();
-  export_to(&mut res, values, options)?;
+  export_to_string(&mut res, values, options)?;
   Ok(res)
 }
 
 #[derive(Debug, PartialEq)]
 pub enum ExportError {
   Fmt(::std::fmt::Error),
-  BadOptions,
+  BadOptions(&'static str),
 }
 
-/// Exports a slice of bytes into a writable.
-pub fn export_to<T: ::std::fmt::Write>(
-  target: &mut T,
+fn export_to_string(
+  target: &mut String,
   values: &[u8],
   options: ExportOptions
 ) -> Result<(), ExportError> {
+  if options.per_line < 3 {
+    return Err(ExportError::BadOptions("per_line needs to be at least 3"));
+  }
+
   let total_value_count = values.len();
   let mut line_value_count = 0;
   let mut ascii = String::new();
@@ -259,7 +279,7 @@ mod tests {
   #[test]
   fn exports_bytes() {
     let mut actual = String::new();
-    assert_eq!(Ok(()), export_to(&mut actual, &[0, 1, 2, 3], ExportOptions {
+    assert_eq!(Ok(()), export_to_string(&mut actual, &[0, 1, 2, 3], ExportOptions {
       with_ascii: false,
       with_offsets: false,
       per_line: 16,
@@ -270,29 +290,29 @@ mod tests {
   #[test]
   fn export_bytes_on_multiple_lines() {
     let mut actual = String::new();
-    assert_eq!(Ok(()), export_to(&mut actual, &[0, 1, 2, 3], ExportOptions {
+    assert_eq!(Ok(()), export_to_string(&mut actual, &[0, 1, 2, 3], ExportOptions {
       with_ascii: false,
       with_offsets: false,
-      per_line: 2,
+      per_line: 3,
     }));
-    assert_eq!("00 01\n02 03", &actual);
+    assert_eq!("00 01 02\n03", &actual);
   }
 
   #[test]
   fn exports_offsets_and_bytes() {
     let mut actual = String::new();
-    assert_eq!(Ok(()), export_to(&mut actual, &[0, 1, 2, 3], ExportOptions {
+    assert_eq!(Ok(()), export_to_string(&mut actual, &[0, 1, 2, 3], ExportOptions {
       with_ascii: false,
       with_offsets: true,
-      per_line: 2,
+      per_line: 3,
     }));
-    assert_eq!("0000 00 01\n0002 02 03", &actual);
+    assert_eq!("0000 00 01 02\n0003 03", &actual);
   }
 
   #[test]
   fn exports_offsets_bytes_and_ascii() {
     let mut actual = String::new();
-    assert_eq!(Ok(()), export_to(&mut actual, &[
+    assert_eq!(Ok(()), export_to_string(&mut actual, &[
       0x61, 0x62, 0x63, 0x64,
       0x65, 0x00, 0x19, 0x7f
     ], ExportOptions {
@@ -306,7 +326,7 @@ mod tests {
   #[test]
   fn exports_offsets_bytes_and_ascii_with_partial_last_line() {
     let mut actual = String::new();
-    assert_eq!(Ok(()), export_to(&mut actual, &[
+    assert_eq!(Ok(()), export_to_string(&mut actual, &[
       0x61, 0x62, 0x63, 0x64,
       0x65, 0x00,
     ], ExportOptions {
