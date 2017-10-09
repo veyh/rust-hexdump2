@@ -1,3 +1,52 @@
+/// Reads a hexdump string into bytes.
+///
+/// # Examples
+///
+/// With only a string of bytes.
+///
+/// ```
+/// assert_eq!(
+///   Some(vec![0x00, 0x01, 0xfe, 0xff]),
+///   hexdump2::import("00 01 fe ff")
+/// );
+/// ```
+///
+/// With offsets.
+///
+/// ```
+/// assert_eq!(
+///   Some(vec![0x00, 0x01, 0xfe, 0xff]),
+///   hexdump2::import("0000 00 01 fe ff")
+/// );
+/// ```
+///
+/// With ascii.
+///
+/// ```
+/// assert_eq!(
+///   Some(vec![0x61, 0x62, 0x63, 0x64, 0x00, 0x19, 0x7f, 0x10]),
+///   hexdump2::import("61 62 63 64 00 19 7f 10 abcd....")
+/// );
+/// ```
+///
+/// With offsets and ascii.
+///
+/// ```
+/// assert_eq!(
+///   Some(vec![0x61, 0x62, 0x63, 0x64, 0x00, 0x19, 0x7f, 0x10]),
+///   hexdump2::import("0000 61 62 63 64 00 19 7f 10 abcd....")
+/// );
+/// ```
+///
+/// Works with multiple lines, too. Minimum number of values on a line is 3.
+///
+/// ```
+/// assert_eq!(
+///   Some(vec![0x61, 0x62, 0x63, 0x64, 0x65]),
+///   hexdump2::import(r#"0000 61 62 63 abc
+///                       0003 64 65    de"#)
+/// );
+/// ```
 pub fn import(data: &str) -> Option<Vec<u8>> {
   let mut buffer = Vec::new();
 
@@ -5,28 +54,36 @@ pub fn import(data: &str) -> Option<Vec<u8>> {
     let line = line.trim();
     let words = line.split(' ');
     let word_count = line.split(' ').count(); // TODO: improve
+    let mut had_padding = false;
 
     for (index, word) in words.enumerate() {
       let len = word.len();
 
+      // extra space
       if len == 0 {
+        had_padding = true;
         continue;
       }
 
-      if let Ok(value) = u64::from_str_radix(word, 16) {
-        if index == 0 && len > 2 {
+      // offset
+      else if index == 0 && len > 2 {
+        continue;
+      }
+
+      else if len == 2 {
+        if index == word_count - 1
+        && had_padding {
           continue;
         }
 
-        buffer.push(value as u8);
-      }
+        else if let Ok(value) = u64::from_str_radix(word, 16) {
+          buffer.push(value as u8);
+          had_padding = false;
+        }
 
-      else if index == word_count - 1 {
-        continue;
-      }
-
-      else {
-        return None;
+        else {
+          return None;
+        }
       }
     }
   }
@@ -40,6 +97,8 @@ pub struct ExportOptions {
   pub with_ascii: bool,
 }
 
+
+/// Exports a slice of bytes into a hexdump string.
 pub fn export(
   values: &[u8],
   options: ExportOptions
@@ -55,6 +114,7 @@ pub enum ExportError {
   BadOptions,
 }
 
+/// Exports a slice of bytes into a writable.
 pub fn export_to<T: ::std::fmt::Write>(
   target: &mut T,
   values: &[u8],
@@ -160,15 +220,6 @@ mod tests {
   #[test]
   fn import_with_bad_hex() {
     assert_eq!(None, import("xx aa bb"));
-    assert_eq!(None, import("000000xx aa bb"));
-  }
-
-  #[test]
-  fn import_with_just_bytes() {
-    assert_eq!(
-      Some(vec![0x00, 0x01, 0xfe, 0xff]),
-      import("00 01 fe ff")
-    );
   }
 
   #[test]
@@ -202,22 +253,6 @@ mod tests {
     assert_eq!(
       Some(vec![0x00, 0x01, 0xfe, 0xff]),
       import("0000000000000000 00 01 fe ff")
-    );
-  }
-
-  #[test]
-  fn import_with_bytes_and_strings() {
-    assert_eq!(
-      Some(vec![0x61, 0x62, 0x63, 0x64, 0x00, 0x19, 0x7f, 0x10]),
-      import("61 62 63 64 00 19 7f 10 abcd....")
-    );
-  }
-
-  #[test]
-  fn import_with_offsets_bytes_and_strings() {
-    assert_eq!(
-      Some(vec![0x61, 0x62, 0x63, 0x64, 0x00, 0x19, 0x7f, 0x10]),
-      import("0000 61 62 63 64 00 19 7f 10 abcd....")
     );
   }
 
