@@ -1,0 +1,6 @@
+[package]
+name = "hexdump2"
+version = "0.1.0"
+authors = ["wibe <wibestn@gmail.com>"]
+
+[dependencies]
