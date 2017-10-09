@@ -35,9 +35,9 @@ pub fn import(data: &str) -> Option<Vec<u8>> {
 }
 
 pub struct ExportOptions {
-  per_line: usize,
-  with_offsets: bool,
-  with_ascii: bool,
+  pub per_line: usize,
+  pub with_offsets: bool,
+  pub with_ascii: bool,
 }
 
 pub fn export(
