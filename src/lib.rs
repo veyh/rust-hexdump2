@@ -125,7 +125,7 @@ pub fn export(
   Ok(res)
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub enum ExportError {
   Fmt(::std::fmt::Error),
   BadOptions(&'static str),
